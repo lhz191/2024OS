@@ -84,6 +84,8 @@ void print_regs(struct pushregs *gpr) {
 
 void interrupt_handler(struct trapframe *tf) {
     intptr_t cause = (tf->cause << 1) >> 1;
+    static int ticks = 0;    // 计数器，用来记录时钟中断次数
+    static int num = 0;      // 计数器，用来记录 "100 ticks" 输出的次数
     switch (cause) {
         case IRQ_U_SOFT:
             cprintf("User software interrupt\n");
@@ -112,6 +114,21 @@ void interrupt_handler(struct trapframe *tf) {
              *(3)当计数器加到100的时候，我们会输出一个`100ticks`表示我们触发了100次时钟中断，同时打印次数（num）加一
             * (4)判断打印次数，当打印次数为10时，调用<sbi.h>中的关机函数关机
             */
+                       // Timer interrupt handling logic
+            // 时钟中断处理
+            clock_set_next_event();  // 设置下一次时钟事件
+            ticks++;  // 时钟中断次数加1
+
+            // 每100次中断，输出 "100 ticks"
+            if (ticks % 100 == 0) {
+                num++;
+                cprintf("100 ticks\n");
+            }
+
+            // 输出10次 "100 ticks" 后，关机
+            if (num == 10) {
+                sbi_shutdown();  // 调用 <sbi.h> 中的关机函数
+            }
             break;
         case IRQ_H_TIMER:
             cprintf("Hypervisor software interrupt\n");

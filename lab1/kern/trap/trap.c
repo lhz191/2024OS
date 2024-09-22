@@ -120,7 +120,7 @@ void interrupt_handler(struct trapframe *tf) {
             ticks++;  // 时钟中断次数加1
 
             // 每100次中断，输出 "100 ticks"
-            if (ticks % 100 == 0) {
+            if (ticks % TICK_NUM == 0) {
                 num++;
                 cprintf("100 ticks\n");
             }
@@ -161,6 +161,12 @@ void exception_handler(struct trapframe *tf) {
         case CAUSE_FAULT_FETCH:
             break;
         case CAUSE_ILLEGAL_INSTRUCTION:
+            // 非法指令异常处理
+            cprintf("Exception type: Illegal instruction\n");
+            cprintf("Illegal instruction caught at 0x%lx\n", tf->epc);  // 打印异常指令地址
+
+            // 更新 epc，使其指向下一条指令
+            tf->epc += 4;  // RISC-V指令长度为4字节
              // 非法指令异常处理
              /* LAB1 CHALLENGE3   YOUR CODE :  */
             /*(1)输出指令异常类型（ Illegal instruction）
@@ -175,6 +181,11 @@ void exception_handler(struct trapframe *tf) {
              *(2)输出异常指令地址
              *(3)更新 tf->epc寄存器
             */
+            cprintf("Exception type: breakpoint\n");
+            cprintf("ebreak caught at 0x%lx\n", tf->epc);  // 打印断点指令地址
+
+            // 更新 epc，跳过断点指令
+            tf->epc += 2;
             break;
         case CAUSE_MISALIGNED_LOAD:
             break;

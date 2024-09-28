@@ -35,7 +35,7 @@ make debug
 make gdb
 ```
 
-![0.5-1](.\img\gbd初始界面.png)
+![0.5-1](https://github.com/lhz191/2024OS/blob/main/lab1/img/gbd%E5%88%9D%E5%A7%8B%E7%95%8C%E9%9D%A2.png?raw=true)
 
 **由上图可以看出，QEMU模拟器启动后程序计数器（PC）首先停在了0x1000**。这是因为在RISC-V架构中，计算机上电复位会将系统的各个组件（如处理器、内存和外设）初始化到默认状态，随后启动Bootloader。在QEMU模拟的环境下，**PC被初始化为0x1000，说明这是系统的复位地址**，通常用于加载引导程序（如OpenSBI），负责初始化硬件并最终将控制权转交给内核镜像。
 

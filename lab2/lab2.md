@@ -107,23 +107,93 @@ default_init_memmap() 函数的作用是初始化一块连续的物理内存区�
 然后跳出循环
 如果遍历到了 free_list 的尾部,还没找到合适的位置
 此时调用 list_add() 函数,将 base 添加到 free_list 的尾部
+
 #### 3.default_alloc_pages函数
    ```C
-
+static struct Page *
+default_alloc_pages(size_t n) {
+    assert(n > 0);
+    if (n > nr_free) {
+        return NULL;
+    }
+    struct Page *page = NULL;
+    list_entry_t *le = &free_list;
+    while ((le = list_next(le)) != &free_list) {
+        struct Page *p = le2page(le, page_link);
+        if (p->property >= n) {
+            page = p;
+            break;
+        }
+    }
+    if (page != NULL) {
+        if (page->property > n) {
+            struct Page *p = page + n;
+            p->property = page->property - n;
+            SetPageProperty(p);
+            list_add(&free_list, &(p->page_link));
+        }
+        list_del(&(page->page_link));
+        ClearPageProperty(page);
+        nr_free -= n;
+    }
+    return page;
+}
    ```
 default_alloc_pages函数用于分配n个连续的物理页。它的实现过程如下:
 
-- 首先检查是否有足够的空闲页可分配,如果 nr_free < n 则返回 NULL。遍历 free_list,找到第一个可满足 n 个页的空闲内存块。具体做法是:
-从 free_list 的头部开始遍历
-对于每个遍历到的空闲内存块(通过 le2page() 宏获取),检查它的属性 property 是否大于等于 n
-如果找到了合适的块,就跳出循环
-如果找到了合适的空闲内存块,则:
-如果该块的大小大于 n,则将剩余部分重新加入到 free_list 中。具体做法是:
-计算剩余部分的大小为 p->property - n
-创建一个新的 Page 结构体,将其属性 property 设置为剩余部分的大小,并设置 PG_property 标志位
-将这个新的 Page 结构体插入到 free_list 中
-从 free_list 中删除该内存块
-将该内存块的属性标志位清除,表示已经被分配
-将 nr_free 减少 n
-最后返回分配的内存块的起始页
+- 首先检查是否有足够的空闲页可分配,如果 nr_free < n 则返回 NULL。遍历 free_list,找到第一个可满足 n 个页的空闲内存块。从 free_list 的头部开始遍历，对于每个遍历到的空闲内存块(通过 le2page() 宏获取),检查它的属性 property 是否大于等于 n，如果找到了合适的块,就跳出循环。
+- 如果找到了合适的空闲内存块,则如果该块的大小大于 n,则将剩余部分重新加入到 free_list 中。计算剩余部分的大小为 p->property - n。创建一个新的 Page 结构体,将其属性 property设置为剩余部分的大小,并设置 PG_property 标志位。
+将这个新的 Page 结构体插入到 free_list 中，从 free_list 中删除该内存块。将该内存块的属性标志位清除,表示已经被分配
+将 nr_free 减少 n，最后返回分配的内存块的起始页。
 
+#### 4.default_free_pages函数
+   ```C
+static void
+default_free_pages(struct Page *base, size_t n) {
+    assert(n > 0);
+    struct Page *p = base;
+    for (; p != base + n; p ++) {
+        assert(!PageReserved(p) && !PageProperty(p));
+        p->flags = 0;
+        set_page_ref(p, 0);
+    }
+    base->property = n;
+    SetPageProperty(base);
+    list_entry_t *le = &free_list;
+    while ((le = list_next(le)) != &free_list) {
+        p = le2page(le, page_link);
+        if (base + base->property == p) {
+            base->property += p->property;
+            ClearPageProperty(p);
+            list_del(&(p->page_link));
+        }
+        else if (p + p->property == base) {
+            p->property += base->property;
+            ClearPageProperty(base);
+            base = p;
+            list_del(&(base->page_link));
+        }
+    }
+    nr_free += n;
+    list_add(&free_list, &(base->page_link));
+}
+   ```
+default_free_pages() 函数用于将一块连续的 n 个物理页释放回空闲内存列表。它的实现过程如下:
+
+- 遍历这 n 个页,检查它们的标志位是否正确(不是保留页且不是空闲页)。然后将它们的标志位和引用计数都重置为 0。将第一个页的属性 property 设置为 n,表示这是一个大小为 n 的空闲内存块。同时设置其 PG_property 标志位。
+- 遍历 free_list,检查是否可以和前后的空闲内存块合并:如果当前页块的尾地址等于下一个空闲页块的起始地址,则合并它们,并从 free_list 中删除下一个页块。
+如果当前页块的起始地址等于上一个空闲页块的尾地址,则合并它们,
+并从 free_list 中删除当前页块(即基地址为 base 的页块)。将合并后的新空闲页块添加到 free_list 中。将 nr_free 增加 n。
+
+*你的first fit算法是否有进一步的改进空间？*
+
+（1）合并空闲块的策略：在 default_free_pages 中，我们实现了合并相邻的空闲块的操作，这样做可以提高操作系统空间分配效率，减少内存碎片的产生。可以考虑在分配时也做相似的检查，在释放页面时，检查前后相邻的空闲块。如果相邻块是空闲的，则合并它们。这样可以减少内存碎片，提高内存使用率。
+
+（2）内存分配策略的多样性：除了 first-fit，可以考虑实现其他分配策略（如 best-fit 或 worst-fit），并根据实际需求选择不同的策略，甚至可以实现自适应的分配策略，动态调整使用的算法。
+
+（3）锁机制：在多线程环境中，考虑在分配和释放过程中加入锁机制，确保线程安全，避免竞态条件。可以在 default_alloc_pages 和 default_free_pages 中使用锁，确保多线程环境下的线程安全。
+
+（4）延迟合并：可以引入延迟合并机制，允许合并操作在特定条件下进行，而不是每次释放时立即合并，这样可能会提高性能。可以定期对 free_list 进行重排，确保空闲块在列表中均匀分布，以加快分配速度。
+
+（5）使用位图：使用位图来管理空闲页，可以在查找和分配时更高效地跟踪空闲状态。可以用位图记录空闲页的状态，每个位对应一个页，值为 1 表示空闲，0 表示已分配。分配时可以快速找到连续空闲页。
+（6）记录分配请求的历史：可以根据系统的历史负载信息和当前的使用模式，建立历史数据记录，分析不同内存请求的模式，预测将来可能的分配和释放操作，提前进行，从而提高运行时性能。

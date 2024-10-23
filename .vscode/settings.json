@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "assert.h": "c",
+        "best_fit_pmm.h": "c",
+        "stdio.h": "c",
+        "buddy_system_pmm.h": "c"
+    }
+}

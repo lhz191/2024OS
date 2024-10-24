@@ -102,6 +102,8 @@ KINCLUDE	+= kern/debug/ \
 			   kern/mm/ \
 			   kern/arch/
 
+# KSRCDIR += kern/mm/buddy_system_pmm.c
+
 KSRCDIR		+= kern/init \
 			   kern/libs \
 			   kern/debug \

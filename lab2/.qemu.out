@@ -22,9 +22,9 @@ PMP1: 0x0000000000000000-0xffffffffffffffff (A,R,W,X)
 (THU.CST) os is loading ...
 Special kernel symbols:
   entry  0xffffffffc0200032 (virtual)
-  etext  0xffffffffc0201b9a (virtual)
-  edata  0xffffffffc0206010 (virtual)
-  end    0xffffffffc0206568 (virtual)
+  etext  0xffffffffc0201c50 (virtual)
+  edata  0xffffffffc0206018 (virtual)
+  end    0xffffffffc0206578 (virtual)
 Kernel executable memory footprint: 26KB
 memory management: buddy_system_pmm_manager
 physcial memory map:
@@ -33,7 +33,7 @@ physcial memory map:
 initial_nr_free_pages 31929
 [buddy_check] before alloc: [dbg_buddy] block: 31  0  0  1  0  1  1  1  0  0  1 
 [buddy_check] trying to alloc 100 * 1 pages
-[buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [dbg_buddy] order 10 list: 00000000c0206100 --> 
+[buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [buddy_check] after alloc: [dbg_buddy] order 10 list: 00000000c0206108 --> 
     ffffffffc020f318 (property: 1024) --> 
     ffffffffc0219318 (property: 1024) --> 
     ffffffffc0223318 (property: 1024) --> 
@@ -67,37 +67,37 @@ initial_nr_free_pages 31929
     ffffffffc033b318 (property: 1024) --> 
     NULL
 
-[dbg_buddy] order  9 list: 00000000c02060e8 --> 
+[dbg_buddy] order  9 list: 00000000c02060f0 --> 
     NULL
 
-[dbg_buddy] order  8 list: 00000000c02060d0 --> 
+[dbg_buddy] order  8 list: 00000000c02060d8 --> 
     NULL
 
-[dbg_buddy] order  7 list: 00000000c02060b8 --> 
+[dbg_buddy] order  7 list: 00000000c02060c0 --> 
     NULL
 
-[dbg_buddy] order  6 list: 00000000c02060a0 --> 
+[dbg_buddy] order  6 list: 00000000c02060a8 --> 
     ffffffffc0345318 (property: 64) --> 
     NULL
 
-[dbg_buddy] order  5 list: 00000000c0206088 --> 
+[dbg_buddy] order  5 list: 00000000c0206090 --> 
     NULL
 
-[dbg_buddy] order  4 list: 00000000c0206070 --> 
+[dbg_buddy] order  4 list: 00000000c0206078 --> 
     ffffffffc0345d18 (property: 16) --> 
     NULL
 
-[dbg_buddy] order  3 list: 00000000c0206058 --> 
+[dbg_buddy] order  3 list: 00000000c0206060 --> 
     NULL
 
-[dbg_buddy] order  2 list: 00000000c0206040 --> 
+[dbg_buddy] order  2 list: 00000000c0206048 --> 
     ffffffffc0345f98 (property: 4) --> 
     NULL
 
-[dbg_buddy] order  1 list: 00000000c0206028 --> 
+[dbg_buddy] order  1 list: 00000000c0206030 --> 
     NULL
 
-[dbg_buddy] order  0 list: 00000000c0206010 --> 
+[dbg_buddy] order  0 list: 00000000c0206018 --> 
     ffffffffc0346038 (property: 1) --> 
     NULL
 
@@ -233,24 +233,6 @@ check_alloc_page() succeeded!
 satp virtual address: 0xffffffffc0205000
 satp physical address: 0x0000000080205000
 ++ setup timer interrupts
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
-100 ticks
 100 ticks
 100 ticks
 100 ticks

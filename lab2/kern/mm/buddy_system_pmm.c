@@ -480,7 +480,7 @@ static void buddy_system_pmm_check(void) {
 }
 
 static void buddy_check(void) {
-    cprintf("11111111111");
+    // cprintf("11111111111");
     buddy_system_pmm_check();
 }
 

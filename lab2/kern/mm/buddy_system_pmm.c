@@ -207,7 +207,7 @@ static void buddy_system_pmm_init_memmap(struct Page *base, size_t n) {
         } else {
             // 对于小于最大块的情况，继续原有逻辑
             n_now -= n_temp;
-            now_page += n_temp; // 更新当前页指针
+            // now_page += n_temp; // 更新当前页指针
             now_page->property = n_temp;
             SetPageProperty(now_page);
             buddy_zone.free_area[order].nr_free += n_temp;
@@ -230,6 +230,7 @@ static void buddy_system_pmm_init_memmap(struct Page *base, size_t n) {
                     le = list_next(le);
                 }
             }
+            now_page += n_temp; // 更新当前页指针
         }
     }
     // cprintf("44444444444444444444444444\n");
@@ -248,7 +249,7 @@ static struct Page * buddy_system_pmm_alloc_pages(size_t n) {
     int order_needed = getorder(getup2(n)); // 找到需要的最小阶层
     order_copy=order_needed;
     // cprintf("order_needed: %d\n", order_needed);  // 打印 n 的值
-    for (int order = order_needed; order <= MAX_ORDER; order++) {
+    for (int order = order_needed; order < MAX_ORDER; order++) {
         if (buddy_zone.free_area[order].nr_free / (1 << order) > 0) {
             // 找到空闲块
             // cprintf("找到的块序号为order: %d\n", order);  // 打印 n 的值

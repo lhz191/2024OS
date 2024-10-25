@@ -15,13 +15,13 @@ buddy_zone_t buddy_zone;  // External declaration for buddy_zone
 
 // Init function for buddy system
 static void buddy_system_pmm_init(void) {
-    cprintf("111111111111111111111111\n");
+    // cprintf("111111111111111111111111\n");
     for (int i = 0; i < MAX_ORDER; i++) {
         list_init(&buddy_zone.free_area[i].free_list);  // Initialize each free list
         buddy_zone.free_area[i].nr_free = 0;  // Properly access nr_free for buddy_zone
     }
     // buddy_zone.free_area[0].nr_free = 0;  // Properly access nr_free for buddy_zone
-     cprintf("22222222222222222222\n");
+    //  cprintf("22222222222222222222\n");
 }
 
 //检查给定的数 n 是否是2的幂次方。
@@ -144,7 +144,7 @@ static void dbg_buddy() {
 
 static void buddy_system_pmm_init_memmap(struct Page *base, size_t n) {
     assert(n > 0);
-    cprintf("3333333333333333333333\n");
+    // cprintf("3333333333333333333333\n");
     struct Page *p = base;
     for (; p != base + n; p++) {
         assert(PageReserved(p));
@@ -158,9 +158,9 @@ static void buddy_system_pmm_init_memmap(struct Page *base, size_t n) {
     struct Page *now_page = base;
     while (n_now != 0) {
         int n_temp = getdown2(n_now);
-        cprintf("n_now: %d\n", n_now);  // 打印 n_now 的值
+        // cprintf("n_now: %d\n", n_now);  // 打印 n_now 的值
         int order = getorder(n_temp);
-        cprintf("order: %d\n", order);  // 打印 order 的值
+        // cprintf("order: %d\n", order);  // 打印 order 的值
 
         // 确保不会超过最大order
         if (order >= MAX_ORDER) {
@@ -198,10 +198,10 @@ static void buddy_system_pmm_init_memmap(struct Page *base, size_t n) {
                         le = list_next(le);
                     }
                 }
-                cprintf("now_page_before: %p\n", now_page);
+                // cprintf("now_page_before: %p\n", now_page);
                 now_page += max_block_size; // 更新当前页指针
-                cprintf("now_page_after: %p\n", now_page);
-                cprintf("Size of struct Page: %u bytes\n", (unsigned int)sizeof(struct Page));
+                // cprintf("now_page_after: %p\n", now_page);
+                // cprintf("Size of struct Page: %u bytes\n", (unsigned int)sizeof(struct Page));
             }
             n_now -= num_blocks * max_block_size; // 更新剩余页数
         } else {
@@ -232,7 +232,7 @@ static void buddy_system_pmm_init_memmap(struct Page *base, size_t n) {
             }
         }
     }
-    cprintf("44444444444444444444444444\n");
+    // cprintf("44444444444444444444444444\n");
 }
 
 
@@ -243,8 +243,10 @@ static struct Page * buddy_system_pmm_alloc_pages(size_t n) {
     if (n > buddy_zone.n_sum) {
         return NULL;
     }
+    int order_copy;
     // cprintf("n: %d\n", n);  // 打印 n 的值
     int order_needed = getorder(getup2(n)); // 找到需要的最小阶层
+    order_copy=order_needed;
     // cprintf("order_needed: %d\n", order_needed);  // 打印 n 的值
     for (int order = order_needed; order <= MAX_ORDER; order++) {
         if (buddy_zone.free_area[order].nr_free / (1 << order) > 0) {
@@ -254,7 +256,7 @@ static struct Page * buddy_system_pmm_alloc_pages(size_t n) {
             // dbg_buddy();
             list_entry_t *le = list_next(&buddy_zone.free_area[order].free_list);
             struct Page *p = le2page(le, page_link);
-            cprintf("删除的页: %p\n", p);
+            // cprintf("删除的页: %p\n", p);
             list_del(&(p->page_link));
             // cprintf("buddy_zone.free_area[order].nr_free: %d\n", buddy_zone.free_area[order].nr_free);  // 打印 n 的值
             buddy_zone.free_area[order].nr_free-=(1<<order);
@@ -264,10 +266,11 @@ static struct Page * buddy_system_pmm_alloc_pages(size_t n) {
             // dbg_buddy();
             // 从找到的块中分裂出合适大小
             struct Page *buddy=p;
+            if(is_pow2(n)||n==1){
             int n_more=(1<<order)-(1<<order_needed);
             while (order > order_needed) {
                 order--;
-                cprintf("多余的页: %p\n", buddy);
+                // cprintf("多余的页: %p\n", buddy);
                 buddy->property = 1 << order;
                 SetPageProperty(buddy);
                 list_add(&buddy_zone.free_area[order].free_list, &buddy->page_link);
@@ -277,12 +280,37 @@ static struct Page * buddy_system_pmm_alloc_pages(size_t n) {
                 // cprintf("buddy_zone.free_area[order].nr_free %d\n", buddy_zone.free_area[order].nr_free);  
             }
             p=buddy+(1<<order_needed);
-            ClearPageProperty(p);
-            cprintf("分配的页: %p\n", buddy);
+            p->property=1<<order_copy;
+            // ClearPageProperty(p);
+            // cprintf("分配的页: %p\n", buddy);
             return p;
+            }
+            else
+            {       
+                cprintf("begin");
+                size_t excess_pages = (1 << order) - n; 
+                // cprintf("多余的页: %p\n", excess_pages);
+                while (excess_pages > 0) {
+                    int highest_pow2 = getdown2(excess_pages); // 找到不超过 excess_pages 的最大 2 的幂
+                    // cprintf("分配的页: %p\n",highest_pow2 );
+                    excess_pages -= highest_pow2;
+                    struct Page *extra_buddy = buddy;
+                    buddy+=1<<highest_pow2;
+                    extra_buddy->property = highest_pow2;
+                    SetPageProperty(extra_buddy);
+                    list_add(&buddy_zone.free_area[getorder(highest_pow2)].free_list, &extra_buddy->page_link);
+                    buddy_zone.free_area[getorder(highest_pow2)].nr_free += highest_pow2;
+                    buddy_zone.n_sum+=highest_pow2;
+                }
+                p=buddy;
+                p->property=1<<order_copy;
+                // ClearPageProperty(p);
+                // cprintf("分配的页: %p\n", buddy);
+                return p;
+            }
         }
     }
-    cprintf("6666666666666666666666666\n");
+    // cprintf("6666666666666666666666666\n");
     return NULL; // 如果没有合适的块
     
 }
@@ -311,7 +339,7 @@ static void buddy_system_pmm_free_pages(struct Page *base, size_t n) {
             list_add(&buddy_zone.free_area[order].free_list, &p->page_link);
             buddy_zone.free_area[order].nr_free += (1 << order);
             buddy_zone.n_sum += (1 << order);
-            cprintf("return\n");
+            // cprintf("return\n");
             return;
         }
 
@@ -324,10 +352,10 @@ static void buddy_system_pmm_free_pages(struct Page *base, size_t n) {
             
             // 打印当前页地址和要合并的页地址
             // 打印当前页地址和要合并的页地址
-            cprintf("first页: %p\n", (uintptr_t)p);
-            cprintf("second页: %p\n", (uintptr_t)current_page);
-            cprintf("p 和 current_page 之间的差值 (16进制): %lx\n", (uintptr_t)p - (uintptr_t)current_page);
-            cprintf("page_size (16进制): %lx\n", page_size);
+            // cprintf("first页: %p\n", (uintptr_t)p);
+            // cprintf("second页: %p\n", (uintptr_t)current_page);
+            // cprintf("p 和 current_page 之间的差值 (16进制): %lx\n", (uintptr_t)p - (uintptr_t)current_page);
+            // cprintf("page_size (16进制): %lx\n", page_size);
             // 检查 p 和 current_page 是否相邻
             if ((uintptr_t)current_page == (uintptr_t)p + page_size * block_size) {
                 // 合并，p 是第一个
@@ -335,7 +363,7 @@ static void buddy_system_pmm_free_pages(struct Page *base, size_t n) {
                 ClearPageProperty(current_page);
                 list_del(&current_page->page_link);
                 merged = 1;
-                cprintf("merge\n");
+                // cprintf("merge\n");
                 break; // 合并完成后退出，准备提升 order
             } else if ((uintptr_t)p == (uintptr_t)current_page + block_size * page_size) {
                 // 合并，current_page 是第一个
@@ -344,7 +372,7 @@ static void buddy_system_pmm_free_pages(struct Page *base, size_t n) {
                 list_del(&p->page_link);
                 p = current_page;  // 更新 p 为 current_page
                 merged = 1;
-                cprintf("merge\n");
+                // cprintf("merge\n");
                 break; // 合并完成后退出，准备提升 order
             }
             if(merged)
@@ -366,7 +394,7 @@ static void buddy_system_pmm_free_pages(struct Page *base, size_t n) {
             list_add(&buddy_zone.free_area[order].free_list, &p->page_link);
             buddy_zone.free_area[order].nr_free += (1 << order);
             buddy_zone.n_sum += (1 << order);
-            cprintf("return\n");
+            // cprintf("return\n");
             return;
         }
         buddy_zone.free_area[order].nr_free -= (1 << order);
@@ -374,143 +402,9 @@ static void buddy_system_pmm_free_pages(struct Page *base, size_t n) {
         // 继续合并到更大的块
         order++;
         free_list_order = &buddy_zone.free_area[order].free_list;
-        cprintf("jixu\n");
+        // cprintf("jixu\n");
     }
 }
-
-
-
-// static size_t nearest_order(size_t n) {
-//     size_t order = 0;
-//     for (size_t i = 0; i < MAX_ORDER; i++) {
-//         if (n <= (1 << i)) {
-//             order = i;
-//             break;
-//         }
-//     }
-
-//     return order;
-// }
-
-// static void add_to_free_list(struct Page *page, size_t order) {
-//     assert(order < MAX_ORDER);
-
-//     buddy_zone.free_area[order].nr_free += page->property;
-
-//     // cprintf("[add_to_free_list] page: 0x%016lx, order: %d, nr_free: %d\n", page,
-//     //         order, buddy_zone.free_area[order].nr_free);
-
-//     if (list_empty(&buddy_zone.free_area[order].free_list)) {
-//         // cprintf("[add_to_free_list] list empty\n");
-//         // initialize the list.
-//         list_add(&buddy_zone.free_area[order].free_list, &(page->page_link));
-//     } else {
-//         // iterator
-//         list_entry_t *le = &buddy_zone.free_area[order].free_list;
-
-//         while ((le = list_next(le)) != &buddy_zone.free_area[order].free_list) {
-//             // cprintf("[add_to_free_list] list next: %016lx, ", le);
-//             // cprintf("free list: %016lx\n",
-//             // &buddy_zone.free_area[order].free_list);
-
-//             // get the corresponding page.
-//             struct Page *p = le2page(le, page_link);
-//             // keep the list sorted.
-//             if (page < p) {
-//                 // insert before the current page.
-//                 // cprintf("[add_to_free_list] insert before: %016lx\n", p);
-//                 list_add_before(le, &(page->page_link));
-//                 break;
-//             } else if (list_next(le) ==
-//                        &buddy_zone.free_area[order].free_list) {
-//                 // cprintf("[add_to_free_list] insert at the end\n");
-//                 // insert at the end of the list.
-//                 list_add(le, &(page->page_link));
-//                 break;
-//             }
-//         }
-//     }
-// }
-
-
-// static void buddy_system_pmm_free_pages(struct Page *base, size_t n) {
-//     int order = (int)nearest_order(n);
-
-//     // cprintf("[buddy_free_pages] n: %d, order: %d\n", n, order);
-
-//     n = 1 << order;
-
-//     struct Page *p = base;
-//     for (; p != base + n; p++) {
-//         assert(!PageReserved(p) && !PageProperty(p));
-//         p->flags = 0;
-//         set_page_ref(p, 0);
-//     }
-
-//     base->property = n;
-//     SetPageProperty(base);
-
-//     struct Page *page = base;
-
-//     add_to_free_list(page, order);
-
-//     while (order < MAX_ORDER - 1) {
-//         // check if this can be combined and hoisted.
-
-//         list_entry_t *le = list_prev(&(page->page_link));
-
-//         if (le != &(buddy_zone.free_area[order].free_list)) {
-//             struct Page *prev_page = le2page(le, page_link);
-
-//             if (prev_page + prev_page->property == page) {
-//                 // combine.
-//                 list_del(le);
-//                 // cprintf("[buddy_free_pages] del: 0x%016lx, order: %d\n",
-//                 //         le2page(le, page_link), order);
-//                 list_del(&(page->page_link));
-//                 // cprintf("[buddy_free_pages] del: 0x%016lx, order: %d\n", page,
-//                 //         order);
-
-//                 buddy_zone.free_area[order].nr_free -= 1 << (order + 1);
-//                 prev_page->property <<= 1;
-//                 // set the flags.
-//                 ClearPageProperty(page);
-//                 // add prev_page to the free list in the larger order.
-//                 order++;
-//                 page = prev_page;
-//                 add_to_free_list(page, order);
-//                 continue;
-//             }
-//         }
-
-//         le = list_next(&(page->page_link));
-
-//         if (le != &(buddy_zone.free_area[order].free_list)) {
-//             struct Page *next_page = le2page(le, page_link);
-
-//             if (page + page->property == next_page) {
-//                 // combine.
-//                 list_del(le);
-//                 // cprintf("[buddy_free_pages] del: 0x%016lx, order: %d\n",
-//                 //         le2page(le, page_link), order);
-//                 list_del(&(page->page_link));
-//                 // cprintf("[buddy_free_pages] del: 0x%016lx, order: %d\n", page,
-//                 //         order);
-//                 buddy_zone.free_area[order].nr_free -= 1 << (order + 1);
-//                 page->property <<= 1;
-//                 // set the flags.
-//                 ClearPageProperty(next_page);
-//                 // add page to the free list in the larger order.
-//                 order++;
-//                 add_to_free_list(page, order);
-//                 continue;
-//             }
-//         }
-
-//         break;
-//     }
-// }
-
 
 
 static size_t buddy_nr_free_pages(void) {
@@ -520,7 +414,8 @@ static size_t buddy_nr_free_pages(void) {
     }
     return total_cnt;
 }
-static void buddy_check_0(void) {
+
+static void buddy_system_pmm_check(void) {
 
 #define ALLOC_PAGE_NUM 100
 
@@ -558,74 +453,35 @@ static void buddy_check_0(void) {
 
     cprintf("[buddy_check_0] after free:   ");
     dbg_buddy();
+        struct Page* p1 = alloc_pages(513);
+    assert(p1 != NULL);
+    assert(p1->property == 1024);
+    cprintf("[buddy_check_1] after alloc 513 pages: ");
+    dbg_buddy();
 
+    struct Page* p2 = alloc_pages(79);
+    assert(p2 != NULL);
+    assert(p2->property == 128);
+    cprintf("[buddy_check_1] after alloc 79 pages:  ");
+    dbg_buddy();
+
+    struct Page* p3 = alloc_pages(37);
+    assert(p3 != NULL);
+    assert(p3->property == 64);
+    cprintf("[buddy_check_1] after alloc 37 pages:  ");
+    dbg_buddy();
+
+    struct Page* p4 = alloc_pages(3);
+    assert(p4 != NULL);
+    assert(p4->property == 4);
+    cprintf("[buddy_check_1] after alloc 3 pages:   ");
+    dbg_buddy();
     cprintf("[buddy_check_0] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");       
 }
 
-// static void buddy_check_1(void) {
-//     cprintf("[buddy_check_1] >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
-
-
-//     size_t initial_nr_free_pages = nr_free_pages();
-
-//     cprintf("[buddy_check_0] before alloc:          ");
-//     dbg_buddy();
-
-//     struct Page* p0 = alloc_pages(512);
-//     assert(p0 != NULL);
-//     assert(p0->property == 512);
-//     cprintf("[buddy_check_1] after alloc 512 pages: ");
-//     dbg_buddy();
-
-//     struct Page* p1 = alloc_pages(513);
-//     assert(p1 != NULL);
-//     assert(p1->property == 1024);
-//     cprintf("[buddy_check_1] after alloc 513 pages: ");
-//     dbg_buddy();
-
-//     struct Page* p2 = alloc_pages(79);
-//     assert(p2 != NULL);
-//     assert(p2->property == 128);
-//     cprintf("[buddy_check_1] after alloc 79 pages:  ");
-//     dbg_buddy();
-
-//     struct Page* p3 = alloc_pages(37);
-//     assert(p3 != NULL);
-//     assert(p3->property == 64);
-//     cprintf("[buddy_check_1] after alloc 37 pages:  ");
-//     dbg_buddy();
-
-//     struct Page* p4 = alloc_pages(3);
-//     assert(p4 != NULL);
-//     assert(p4->property == 4);
-//     cprintf("[buddy_check_1] after alloc 3 pages:   ");
-//     dbg_buddy();
-
-//     struct Page* p5 = alloc_pages(196);
-//     assert(p5 != NULL);
-//     assert(p5->property == 256);
-//     cprintf("[buddy_check_1] after alloc 196 pages: ");
-//     dbg_buddy();
-
-//     free_pages(p4, 3);
-//     free_pages(p0, 512);
-//     free_pages(p2, 79);
-//     free_pages(p3, 37);
-//     free_pages(p5, 196);
-//     free_pages(p1, 513);
-
-//     cprintf("[buddy_check_1] after free:            ");
-//     dbg_buddy();
-
-//     assert(nr_free_pages() == initial_nr_free_pages);
-
-//     cprintf("[buddy_check_1] <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
-// }
-
 static void buddy_check(void) {
     cprintf("11111111111");
-    buddy_check_0();
-    // buddy_check_1();
+    buddy_system_pmm_check();
 }
 
 const struct pmm_manager buddy_system_pmm_manager = {

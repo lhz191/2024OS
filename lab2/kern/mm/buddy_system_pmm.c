@@ -290,17 +290,30 @@ static struct Page * buddy_system_pmm_alloc_pages(size_t n) {
                 cprintf("begin");
                 size_t excess_pages = (1 << order) - n; 
                 // cprintf("多余的页: %p\n", excess_pages);
-                while (excess_pages > 0) {
-                    int highest_pow2 = getdown2(excess_pages); // 找到不超过 excess_pages 的最大 2 的幂
-                    // cprintf("分配的页: %p\n",highest_pow2 );
-                    excess_pages -= highest_pow2;
-                    struct Page *extra_buddy = buddy;
-                    buddy+=1<<highest_pow2;
-                    extra_buddy->property = highest_pow2;
-                    SetPageProperty(extra_buddy);
-                    list_add(&buddy_zone.free_area[getorder(highest_pow2)].free_list, &extra_buddy->page_link);
-                    buddy_zone.free_area[getorder(highest_pow2)].nr_free += highest_pow2;
-                    buddy_zone.n_sum+=highest_pow2;
+                // while (excess_pages > 0) {
+                //     int highest_pow2 = getdown2(excess_pages); // 找到不超过 excess_pages 的最大 2 的幂
+                //     // cprintf("分配的页: %p\n",highest_pow2 );
+                //     excess_pages -= highest_pow2;
+                //     struct Page *extra_buddy = buddy;
+                //     buddy+=1<<highest_pow2;
+                //     extra_buddy->property = highest_pow2;
+                //     SetPageProperty(extra_buddy);
+                //     list_add(&buddy_zone.free_area[getorder(highest_pow2)].free_list, &extra_buddy->page_link);
+                //     buddy_zone.free_area[getorder(highest_pow2)].nr_free += highest_pow2;
+                //     buddy_zone.n_sum+=highest_pow2;
+                // }
+                // 当空闲块大于2倍需要的大小时，继续分裂
+                cprintf("order: %d\n", order);  // 打印 n 的值
+                cprintf("n: %d\n", n);  // 打印 n 的值
+                while ((1 << order) > 2 * n) {
+                    order--;
+                    struct Page *split_buddy = p + (1 << (order-1));
+                    p+=1<<order;
+                    // 把分裂出来的块放入空闲列表
+                    split_buddy->property = 1 << (order-1);
+                    SetPageProperty(split_buddy);
+                    list_add(&buddy_zone.free_area[order-1].free_list, &split_buddy->page_link);
+                    buddy_zone.free_area[order-1].nr_free+=(1<<(order-1));
                 }
                 p=buddy;
                 p->property=1<<order_copy;

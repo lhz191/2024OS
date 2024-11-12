@@ -14,6 +14,8 @@
  *           24 bits            7 bits    1 bit
  * */
 
+//NEW: 为什么要这样设计，页表项不是64位的吗，而且从第10位开始才是物理页号
+
 #define MAX_SWAP_OFFSET_LIMIT                   (1 << 24)
 
 extern size_t max_swap_offset;

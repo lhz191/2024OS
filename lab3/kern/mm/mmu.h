@@ -51,6 +51,7 @@
 #define PGADDR(d1, d0, t, o) ((uintptr_t)((d1) << PDX1SHIFT | (d0) << PDX0SHIFT | (t) << PTXSHIFT | (o)))
 
 // address in page table or page directory entry
+//NEW: 原本偏移PTE_PPN_SHIFT（10）位，而地址需要偏移PTXSHIFT（12）位，故需要左移(PTXSHIFT - PTE_PPN_SHIFT)位
 #define PTE_ADDR(pte)   (((uintptr_t)(pte) & ~0x3FF) << (PTXSHIFT - PTE_PPN_SHIFT))
 #define PDE_ADDR(pde)   PTE_ADDR(pde)
 

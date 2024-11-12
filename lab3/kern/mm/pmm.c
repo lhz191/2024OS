@@ -347,6 +347,7 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm) {
     page_ref_inc(page);
     if (*ptep & PTE_V) {
         struct Page *p = pte2page(*ptep);
+        // NEW: 已经存在相同映射
         if (p == page) {
             page_ref_dec(page);
         } else {

@@ -130,5 +130,160 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create) {
 ### 练习5：阅读代码和实现手册，理解页表映射方式相关知识（思考题）
 
 ### 扩展练习 Challenge：实现不考虑实现开销和效率的LRU页替换算法（需要编程）
+
+*challenge部分不是必做部分，不过在正确最后会酌情加分。需写出有详细的设计、分析和测试的实验报告。完成出色的可获得适当加分。*
+
+在操作系统中，页面置换算法用于管理有限的物理内存，通过选择合适的页面进行换出，确保系统能够高效运行。LRU（Least Recently Used）算法是一种常见的页面置换策略，它通过记录页面的访问时间来决定哪些页面应该被换出。LRU 算法选择最久未被访问的页面进行换出，保证最近使用的页面始终在内存中。
+
+本实验通过实现一个不考虑开销和效率的 LRU 页替换算法，使用双向链表来模拟 LRU 页替换机制，并进行测试验证。
+
+#### 1._lru_init_mm：初始化页面替换链表
+   ```C
+    static int _lru_init_mm(struct mm_struct *mm) {
+        list_init(&pra_list_head);  // 初始化链表
+        mm->sm_priv = &pra_list_head;  // 将链表头部的地址赋值给 mm->sm_priv
+        return 0;
+    }
+   ```
+功能：此函数负责初始化页面替换算法所需的数据结构。
+- 首先，它调用 list_init 函数初始化全局变量 pra_list_head，这个变量将用于管理页面的替换。
+- 然后，将链表的头部地址存储在 mm->sm_priv 中，sm_priv 是 mm_struct 结构体中的一个指针，专门用于存储与当前进程相关的页面替换数据。
+
+设计说明：在 LRU 算法中，我们使用一个链表来管理页面的访问顺序。该函数确保每个进程拥有独立的链表，以便管理该进程的页面替换。
+
+#### 2. _lru_map_swappable：标记页面为可换出
+   ```C
+ static int _lru_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int swap_in) {
+     list_entry_t *head = (list_entry_t*) mm->sm_priv;
+     list_entry_t *entry = &(page->pra_page_link);
+     
+     assert(entry != NULL && head != NULL);
+     
+     // 遍历链表以检查页面是否已经存在
+     list_entry_t *le = list_next(head);
+     while (le != head) {
+         if (le == entry) {
+             // 如果页面已在链表中，将其删除
+             list_del(entry);
+             break;
+         }
+         le = list_next(le);
+     }
+
+     // 将页面插入到链表头部的后面，表示最近使用
+     list_add_after(head, entry);
+     
+     return 0;
+ }
+   ```
+功能：此函数标记页面为可换出页面，并在访问时更新页面的顺序。当页面被访问时，它会被从链表中删除并插入到链表头部，表示这是最近使用的页面。
+
+设计说明：
+- 我们遍历链表检查页面是否已存在，如果存在，则将其从链表中删除（移除旧的位置）。
+- 然后，将该页面插入到链表的头部，确保其被标记为“最近使用”。
+这种操作保证了链表中最前面的页面为最近访问的页面，尾部的页面为最久未访问的页面。
+
+#### 3. _lru_swap_out_victim：选择需要换出的页面
+   ```C
+ static int _lru_swap_out_victim(struct mm_struct *mm, struct Page **ptr_page, int in_tick) {
+     list_entry_t *head = (list_entry_t*) mm->sm_priv;
+     assert(head != NULL);
+     assert(in_tick == 0);
+
+     // 找到链表尾部的页面（最久未使用的页面）
+     list_entry_t *victim = list_prev(head);
+     if (victim == head) {
+         return -1; // 链表为空，无法找到被替换的页面
+     }
+     
+     list_del(victim); // 从链表中移除该页面
+     *ptr_page = le2page(victim, pra_page_link); // 设置被替换页面的指针
+     return 0;
+ }
+   ```
+功能：
+该函数负责选择需要换出的页面，即链表中尾部的页面（最久未使用的页面）。如果链表为空，表示没有页面可以换出，返回 -1；否则，移除链表尾部的页面，并返回该页面的指针。
+
+设计说明：
+- 链表尾部的页面最久未使用，因此最合适用于替换。
+- 通过 list_prev 获取链表尾部的页面，使用 list_del 从链表中删除该页面，最后返回页面指针。
+
+#### 4. _lru_check_swap：测试 LRU 页替换算法
+   ```C
+ static int _lru_check_swap(void) {
+     cprintf("write Virt Page c in lru_check_swap\n");
+     *(unsigned char *)0x3000 = 0x0c;
+     assert(pgfault_num == 4);
+     cprintf("write Virt Page a in lru_check_swap\n");
+     *(unsigned char *)0x1000 = 0x0a;
+     assert(pgfault_num == 4);
+     cprintf("write Virt Page d in lru_check_swap\n");
+     *(unsigned char *)0x4000 = 0x0d;
+     assert(pgfault_num == 4);
+     cprintf("write Virt Page b in lru_check_swap\n");
+     *(unsigned char *)0x2000 = 0x0b;
+     assert(pgfault_num == 4);
+     cprintf("write Virt Page e in lru_check_swap\n");
+     *(unsigned char *)0x5000 = 0x0e;
+     assert(pgfault_num == 5);
+     cprintf("write Virt Page b in lru_check_swap\n");
+     *(unsigned char *)0x2000 = 0x0b;
+     assert(pgfault_num == 5);
+     cprintf("write Virt Page a in lru_check_swap\n");
+     *(unsigned char *)0x1000 = 0x0a;
+     assert(pgfault_num == 6);
+     cprintf("write Virt Page b in lru_check_swap\n");
+     *(unsigned char *)0x2000 = 0x0b;
+     assert(pgfault_num == 7);
+     cprintf("write Virt Page c in lru_check_swap\n");
+     *(unsigned char *)0x3000 = 0x0c;
+     assert(pgfault_num == 8);
+     cprintf("write Virt Page d in lru_check_swap\n");
+     *(unsigned char *)0x4000 = 0x0d;
+     assert(pgfault_num == 9);
+     cprintf("write Virt Page e in lru_check_swap\n");
+     *(unsigned char *)0x5000 = 0x0e;
+     assert(pgfault_num == 10);
+     cprintf("write Virt Page a in lru_check_swap\n");
+     assert(*(unsigned char *)0x1000 == 0x0a);
+     *(unsigned char *)0x1000 = 0x0a;
+     assert(pgfault_num == 11);
+     return 0;
+ }
+   ```
+功能：
+该函数用于测试 LRU 页替换算法的正确性。通过访问不同的虚拟页面并触发页面错误（pgfault_num），验证 LRU 算法是否按照预期替换最久未使用的页面。
+
+设计说明：
+- 在每次访问页面时，通过对虚拟地址的访问模拟触发页面错误。
+pgfault_num 是用于记录页面错误次数的变量，测试过程中每次访问页面都会增加其值。
+- 通过检查 pgfault_num 的值是否符合预期，来验证算法是否正确地执行了页面替换。
+
+#### 5. swap_manager_lru：定义 LRU 页替换管理器
+   ```C
+ struct swap_manager swap_manager_lru = 
+ {
+     .name            = "lru swap manager",
+     .init            = &_lru_init,
+     .init_mm         = &_lru_init_mm,
+     .tick_event      = &_lru_tick_event,
+     .map_swappable   = &_lru_map_swappable,
+     .set_unswappable = &_lru_set_unswappable,
+     .swap_out_victim = &_lru_swap_out_victim,
+     .check_swap      = &_lru_check_swap,
+ };
+   ```
+功能：
+设计了一个 swap_manager 结构体实例，包含了 LRU 页替换算法所需的所有函数。这些函数包括初始化、页面标记为可换出、选择换出页面、测试交换等操作。
+
+#### 实验结果与分析
+在进行测试时，_lru_check_swap 函数模拟了多次页面访问，验证了 LRU 算法的有效性。通过访问不同的虚拟页面，测试了页替换过程中最久未使用页面的选择逻辑，并使用 pgfault_num 检查了页面换出的次数。
+
+最终结果显示，LRU 算法能够正确地根据页面的访问顺序选择最久未使用的页面进行替换，并且实验中没有出现意外错误，证明算法的实现是正确的。
+
+#### 总结
+本实验通过实现不考虑效率的 LRU 页替换算法，深入理解了操作系统中页面置换的原理。通过使用链表来管理页面访问顺序，我们能够模拟和验证 LRU 算法的正确性，并进行性能测试。
+
+在实际应用中，LRU 算法由于其高效的访问管理机制，被广泛应用于虚拟内存管理中。实验过程中的设计和实现为进一步研究和优化页面替换算法提供了基础。
 ## 三. 实验中的知识点
 

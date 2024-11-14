@@ -125,6 +125,8 @@ extern struct mm_struct *check_mm_struct;
 
 void interrupt_handler(struct trapframe *tf) {
     intptr_t cause = (tf->cause << 1) >> 1;
+    static int ticks = 0;    // 计数器，用来记录时钟中断次数
+    static int num = 0;      // 计数器，用来记录 "100 ticks" 输出的次数
     switch (cause) {
         case IRQ_U_SOFT:
             cprintf("User software interrupt\n");
@@ -147,9 +149,18 @@ void interrupt_handler(struct trapframe *tf) {
             // In fact, Call sbi_set_timer will clear STIP, or you can clear it
             // directly.
             // clear_csr(sip, SIP_STIP);
-            clock_set_next_event();
-            if (++ticks % TICK_NUM == 0) {
-                print_ticks();
+            clock_set_next_event();  // 设置下一次时钟事件
+            ticks++;  // 时钟中断次数加1
+
+            // 每100次中断，输出 "100 ticks"
+            if (ticks % TICK_NUM == 0) {
+                num++;
+                cprintf("100 ticks\n");
+            }
+
+            // 输出10次 "100 ticks" 后，关机
+            if (num == 10) {
+                sbi_shutdown();  // 调用 <sbi.h> 中的关机函数
             }
             break;
         case IRQ_H_TIMER:
@@ -186,11 +197,32 @@ void exception_handler(struct trapframe *tf) {
         case CAUSE_FETCH_ACCESS:
             cprintf("Instruction access fault\n");
             break;
-        case CAUSE_ILLEGAL_INSTRUCTION:
-            cprintf("Illegal instruction\n");
+            // 非法指令异常处理
+            cprintf("Exception type: Illegal instruction\n");
+            cprintf("Illegal instruction caught at 0x%lx\n", tf->epc);  // 打印异常指令地址
+
+            // 更新 epc，使其指向下一条指令
+            tf->epc += 4;  // RISC-V指令长度为4字节
+             // 非法指令异常处理
+             /* LAB1 CHALLENGE3   YOUR CODE :  */
+            /*(1)输出指令异常类型（ Illegal instruction）
+             *(2)输出异常指令地址
+             *(3)更新 tf->epc寄存器
+            */
             break;
         case CAUSE_BREAKPOINT:
-            cprintf("Breakpoint\n");
+            //断点异常处理
+            /* LAB1 CHALLLENGE3   YOUR CODE :  */
+            /*(1)输出指令异常类型（ breakpoint）
+             *(2)输出异常指令地址
+             *(3)更新 tf->epc寄存器
+            */
+            cprintf("Exception type: breakpoint\n");
+            cprintf("ebreak caught at 0x%lx\n", tf->epc);  // 打印断点指令地址
+
+            // 更新 epc，跳过断点指令
+            tf->epc += 2;
+            break;
             break;
         case CAUSE_MISALIGNED_LOAD:
             cprintf("Load address misaligned\n");

@@ -58,7 +58,7 @@ _clock_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, in
     // 将页面page插入到页面链表pra_list_head的末尾
     // 将页面的visited标志置为1，表示该页面已被访问
     list_entry_t *head=(list_entry_t*) mm->sm_priv;
-    //NEW: 改为list_add就会报错，奇怪
+    // 每次插到尾部，并将访问位设置为1
     list_add_before(head, entry);
     page->visited = 1;
     return 0;
@@ -88,6 +88,8 @@ _clock_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tic
             curr_ptr = list_next(curr_ptr);
             continue;
         }
+    //当链表已满时，需要调出块，调出块就是遍历链表，如果标志位为1就置为0，继续遍历，
+    //直到遍历到访问位为0的块，将其删去，指针后移，再将调入快插到链表后端
         struct Page *page = le2page(curr_ptr, pra_page_link);
         if(page->visited == 0) {
             cprintf("curr_ptr %p\n", curr_ptr);

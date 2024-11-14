@@ -52,6 +52,7 @@ _fifo_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int
 
     //(1)link the most recent arrival page at the back of the pra_list_head qeueue.
     list_add(head, entry);
+    //每次插入时，插到head紧邻着的后面。
     return 0;
 }
 /*
@@ -67,6 +68,8 @@ _fifo_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick
      /* Select the victim */
      //(1)  unlink the  earliest arrival page in front of pra_list_head qeueue
      //(2)  set the addr of addr of this page to ptr_page
+     //每次插入时，插到head紧邻着的后面。
+    //这样，当链表已满时，head前面那个就是最早调入的块，将其调出，然后将新的块再插入到head紧邻的后面
     list_entry_t* entry = list_prev(head);
     if (entry != head) {
         list_del(entry);

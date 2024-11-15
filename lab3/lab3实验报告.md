@@ -124,10 +124,175 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create) {
 
 
 
-
 ### 练习4：补充完成Clock页替换算法（需要编程）
 
+Clock算法也被称为"二次机会算法"或"简单的CLOCK算法"，其核心思想是给那些曾经被访问过的页面一个"第二次机会"，避免将经常使用的页面置换出去。
+
+原理如下：
+
+#### 1、基本结构：
+
+- 维护一个循环链表，存放所有的页面
+- 每个页面都有一个访问位(visited bit)，用于标记该页面是否被访问过
+- 有一个类似时钟指针的标记(clock hand)，用于遍历这个循环链表
+
+#### 2、算法流程
+
+初始状态：
+- 所有新加入的页面，访问位都设为1
+- 时钟指针指向最老的页面
+
+当需要替换页面时：
+1. 检查当前指针指向的页面：
+   - 如果访问位=0：该页面被选作替换页面
+   - 如果访问位=1：将访问位改为0，指针移到下一个页面
+2. 重复步骤1直到找到可替换的页面
+
+Clock页替换算法所是实现的函数接口与FIFO页替换算法的函数接口一致，均为swap_manager结构体所定义的函数接口，主要函数如下：
+
+好的,我来详细解释Clock算法的每个函数设计说明。
+
+1. _clock_init_mm：初始化页面替换链表和时钟指针
+```c
+static int
+_clock_init_mm(struct mm_struct *mm)
+{     
+
+     // 初始化pra_list_head为空链表
+     // 初始化当前指针curr_ptr指向pra_list_head，表示当前页面替换位置为链表头
+     // 将mm的私有成员指针指向pra_list_head，用于后续的页面替换算法操作
+
+     list_init(&pra_list_head);
+     curr_ptr = &pra_list_head;
+     mm->sm_priv = &pra_list_head;
+     return 0;
+}
+```
+
+功能：此函数负责初始化Clock算法所需的数据结构。
+* 首先调用list_init初始化全局变量pra_list_head，用于构建循环链表结构
+* 将curr_ptr指针(时钟指针)初始化为指向链表头
+* 将链表头地址存储在mm->sm_priv中，用于后续的页面替换操作
+
+设计说明：在Clock算法中，我们需要一个循环链表来模拟时钟结构，curr_ptr作为时钟指针在链表中循环移动。该函数确保每个进程拥有独立的页面替换机制。
+
+2. _clock_map_swappable：将新页面加入循环链表
+```c
+static int
+_clock_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int swap_in)
+{
+    list_entry_t *entry=&(page->pra_page_link);
+ 
+    assert(entry != NULL && curr_ptr != NULL);
+    // 将页面page插入到页面链表pra_list_head的末尾
+    // 将页面的visited标志置为1，表示该页面已被访问
+    list_entry_t *head=(list_entry_t*) mm->sm_priv;
+    // 每次插到尾部，并将访问位设置为1
+    list_add_before(head, entry);
+    page->visited = 1;
+    return 0;
+}
+```
+
+功能：此函数负责将新页面加入到循环链表中，并初始化其访问位。
+* 将新页面添加到链表末尾
+* 将页面的访问位(visited)设置为1，表示该页面刚被访问过
+
+设计说明：
+* 新加入的页面被放在链表末尾，保持时钟的循环特性
+* 访问位设为1给予新页面一次"机会"，避免其刚加入就被替换出去
+
+3. _clock_swap_out_victim：选择被替换的页面
+```c
+static int
+_clock_swap_out_victim(struct mm_struct *mm, struct Page ** ptr_page, int in_tick)
+{
+     list_entry_t *head=(list_entry_t*) mm->sm_priv;
+         assert(head != NULL);
+     assert(in_tick==0);
+    while (1) {
+        // 遍历页面链表pra_list_head，查找最早未被访问的页面
+        // 获取当前页面对应的Page结构指针
+        // 如果当前页面未被访问，则将该页面从页面链表中删除，并将该页面指针赋值给ptr_page作为换出页面
+        // 如果当前页面已被访问，则将visited标志置为0，表示该页面已被重新访问
+        if(curr_ptr == head) 
+        {
+            curr_ptr = list_next(curr_ptr);
+            continue;
+        }
+    //当链表已满时，需要调出块，调出块就是遍历链表，如果标志位为1就置为0，继续遍历，
+    //直到遍历到访问位为0的块，将其删去，指针后移，再将调入快插到链表后端
+        struct Page *page = le2page(curr_ptr, pra_page_link);
+        if(page->visited == 0) {
+            cprintf("curr_ptr %p\n", curr_ptr);
+            list_entry_t *next = list_next(curr_ptr);
+            list_del(curr_ptr);
+            *ptr_page = page;
+            curr_ptr = next;  
+            break;
+        }
+        else {
+            page->visited = 0;
+            curr_ptr = list_next(curr_ptr);
+        }
+    }
+    return 0;
+}
+```
+
+功能：此函数负责选择要被替换出去的页面。
+* 时钟指针curr_ptr在循环链表中移动，检查每个页面的访问位
+* 如果遇到访问位为0的页面，选择该页面进行替换
+* 如果页面访问位为1，将其置为0并继续查找
+
+设计说明：
+* 实现了Clock算法的核心思想：给予页面"第二次机会"
+* 通过访问位的检查和重置，保证经常使用的页面不会被轻易替换
+* 时钟指针的循环移动确保了页面替换的公平性
+
+这种实现体现了Clock算法的特点：既考虑了页面的使用频率（通过访问位），又保持了实现的简单性（通过循环链表和时钟指针）。相比FIFO算法，它能更好地适应程序的局部性原理，提供更好的性能表现。
+
+
+
 ### 练习5：阅读代码和实现手册，理解页表映射方式相关知识（思考题）
+
+与分级页表相比，一个大页具有如下优势和劣势：
+
+优势：
+
+* 性能更好
+
+	- TLB命中率提高，因为一个TLB表项可以覆盖更大的内存范围
+
+	- 页表层级更少，减少了内存访问次数
+
+	- 页表占用空间更小,节省内存
+
+* 管理简单
+	- 页表结构简单,维护成本低
+	- 地址转换过程更直接
+
+缺点：
+
+* 内存碎片
+
+	* 大页会造成更严重的内部碎片
+
+	* 内存利用率可能降低
+
+* 灵活性差
+
+	- 不能细粒度地控制内存访问权限，这可能导致严重的安全风险，例如内核代码被篡改
+
+	- 对小块内存分配不友好
+	- 难以实现按需分页(demand paging)
+
+安全风险
+
+- 一个页面错误可能影响更大范围的内存
+- 权限粒度太粗,可能带来安全隐患
+
+
 
 ### 扩展练习 Challenge：实现不考虑实现开销和效率的LRU页替换算法（需要编程）
 

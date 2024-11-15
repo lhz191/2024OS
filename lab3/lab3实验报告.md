@@ -112,12 +112,123 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create) {
 
 
 
+练习3的目标是补充实现 `do_pgfault` 函数，该函数在缺页异常发生时执行。缺页异常通常发生在进程访问未映射的虚拟内存地址时，我们需要根据地址在进程的虚拟内存区域（VMA）中查找相应的映射，并为缺失的页面分配物理内存，最终建立虚拟地址到物理地址的映射。实现过程中还需处理内存访问权限，确保合适的权限映射。
+
+
+在补充实现 `do_pgfault` 函数之前，我们首先需要了解缺页异常处理的流程和涉及的内存管理结构。`do_pgfault` 的主要职责是处理缺页异常，在虚拟地址未映射时，分配新的物理页面，并根据 VMA 设置访问权限。
+
+### 3.1. `do_pgfault` 函数的工作流程
+
+1. **查找 VMA**：首先，根据传入的地址 `addr` 查找虚拟内存区域（VMA）。VMA 是表示一段连续虚拟内存空间的数据结构，包含该区域的起始地址、结束地址以及访问权限等信息。
+   
+2. **检查地址有效性**：如果在 `mm` 中没有找到对应的 VMA，或者 `addr` 不在 VMA 的有效范围内，直接返回错误。
+
+3. **检查访问权限**：根据 `VMA` 的权限标志（`VM_WRITE`, `VM_READ` 等），决定如何处理内存页。如果该地址处于 VMA 的写权限范围内，我们将其标记为可写。
+
+4. **查找页表项**：通过虚拟地址计算页表项（PTE），如果页表项不存在，则需要分配新的物理页，初始化页表。
+
+5. **页表分配和映射**：如果页表项已经存在，但标记为交换页面（swapped out），则需要从磁盘交换数据到物理内存，并完成页表的更新。
+
+6. **设置页面为可交换**：最后，设置该页面为可交换状态。
+
+### 3.2 关键部分实现
+
+以下是 `do_pgfault` 函数中的关键步骤和所涉及的函数：
+
+#### 1. 查找虚拟内存区域（VMA）
+
+```c
+struct vma_struct *vma = find_vma(mm, addr);
+if (vma == NULL || vma->vm_start > addr) {
+    cprintf("not valid addr %x, and can not find it in vma\n", addr);
+    goto failed;
+}
+```
 
 
 
+#### 2. 查找页表项并分配物理页
+
+我们需要实现从磁盘加载数据到物理页面，并将物理页面映射到逻辑地址空间的功能。当遇到缺页异常时，代码会检查页表项（PTE）是否存在。若不存在（即虚拟地址没有映射到物理页面），则会尝试分配新的物理页面。如果页表项存在，但它是一个交换页面（即页面内容已经被交换到磁盘），则需要从磁盘加载数据到物理页面并更新页表项。
 
 
+* 页表项为空的处理： 当页表项 *ptep 为 0 时，说明虚拟地址没有映射到物理内存，此时我们需要调用 pgdir_alloc_page 分配新的物理页面。
+```c
+pte_t *ptep = get_pte(mm->pgdir, addr, 1);
+if (*ptep == 0) {
+    if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL) {
+        cprintf("pgdir_alloc_page in do_pgfault failed\n");
+        goto failed;
+    }
+} 
+```
+这段代码会检查当前页表项是否为空。如果为空，则调用 pgdir_alloc_page 为该地址分配一个新的物理页面，并将该页面映射到虚拟地址 addr。如果分配失败，打印错误信息并跳转到失败处理部分。
 
+
+* 页表项非空，且是交换页面的处理： 当页表项不为空且为交换页面时，我们需要从磁盘加载数据到物理页面。（需要添加的部分）
+```c
+else {
+    /* LAB3 EXERCISE 3: YOUR CODE */
+    // 现在我们认为pte是一个交换条目，我们应该从磁盘加载数据并放到带有phy addr的页面，
+    // 并将phy addr与逻辑addr映射，触发交换管理器记录该页面的访问情况
+
+    if (swap_init_ok) {
+        struct Page *page = NULL;
+
+        // (1) 根据 mm 和 addr，尝试加载对应的磁盘页面内容到内存中
+        swap_in(mm, addr, &page);
+
+        // (2) 根据 mm、addr 和 page 设置物理地址和虚拟地址的映射关系
+        page_insert(mm->pgdir, page, addr, perm);
+
+        // (3) 设置页面为可交换
+        swap_map_swappable(mm, addr, page, 1);
+
+        // 记录页面的虚拟地址
+        page->pra_vaddr = addr;
+    } else {
+        cprintf("no swap_init_ok but ptep is %x, failed\n", *ptep);
+        goto failed;
+    }
+}
+
+```
+ 在这段代码中，swap_init_ok 用于标记交换机制是否已初始化。如果未初始化，我们无法从磁盘加载数据，因此必须确保 swap_init_ok 为真。 swap_in(mm, addr, &page) 函数负责从磁盘读取对应的页面数据，并将其存放到分配的物理页面 page 中。使用 page_insert(mm->pgdir, page, addr, perm) 将加载的物理页面与虚拟地址 addr 映射。perm 参数确保访问权限的正确设置将该页面标记为可交换，这使得该页面在内存压力较大时可以被交换到磁盘。 page->pra_vaddr = addr 记录页面的虚拟地址，供后续的内存管理使用。
+
+### 3.3 页目录项和页表项对页替换算法的潜在用处
+- **页目录项（PDE）**：页目录项指向一个页表，每个页表项对应一个物理页面。页目录项中包含的信息，如页表的起始地址（物理地址），可以帮助操作系统定位虚拟地址的物理页表，并进一步确定虚拟页是否在物理内存中。
+
+- **页表项（PTE）**：每个页表项对应一个虚拟页的物理页映射。它包含了虚拟页到物理页的映射信息，以及该页是否在内存中（通过标志位如 `PTE_P`）、页面是否可写（`PTE_W`）、是否可执行（`PTE_X`）等。此外，页表项还可能包含指向交换空间的标志或指针，指示该页面是否已被交换到磁盘。
+
+在 **页替换算法** 中，页表项的 `PTE` 可以帮助操作系统判断页面是否需要被换出。如果页表项指向的物理页面已被修改并且标记为脏页，则需要将其写回磁盘。否则，页面可以直接交换出去。页面的 `PTE` 还可以帮助操作系统决定哪些页面可以被替换（例如，LRU 算法通过访问位来判断最近未使用的页面）。
+
+### 3.4 缺页服务例程中访问内存时硬件需要做的事情
+
+当缺页服务例程在执行过程中访问内存并发生页访问异常时，硬件将会执行以下操作：
+
+1. **检测异常**：硬件会首先检测到虚拟地址未映射到物理内存，导致发生缺页异常（Page Fault）。
+
+2. **触发中断**：硬件会触发一个中断，将控制权转交给操作系统的缺页异常处理程序。操作系统会根据异常发生的地址（`addr`）查找是否有映射关系，以及是否需要为该地址分配新的物理页面。
+
+3. **保存上下文**：硬件会保存当前执行的上下文（如 CPU 寄存器的内容），以便缺页异常处理完毕后恢复。
+
+4. **查询页表**：硬件会查询当前进程的页表项（PTE），并根据页表项的内容确定如何处理缺页。例如，硬件会查看该页表项是否有效（是否指向一个有效的物理页）。
+
+5. **调用缺页处理程序**：在操作系统层面，操作系统会根据当前页表的状态决定是分配新的物理页面，还是从磁盘加载页面，或者直接返回错误。
+
+6. **恢复执行**：一旦缺页异常处理程序完成后，硬件会恢复执行，继续执行发生异常的指令。
+
+
+### 3.5 `Page` 数据结构与页目录项、页表项的对应关系
+
+`Page` 数据结构通常是内存管理中的基本单元。它是一个表示内存页面的结构，通常存储页的物理地址、引用计数、状态（如是否被修改）等信息。在一些实现中，`Page` 结构的数组对应于物理内存中的所有页面。
+
+- **与页目录项（PDE）和页表项（PTE）的对应关系**：`Page` 数组中的每一项通常与虚拟地址的页目录项（PDE）和页表项（PTE）有着直接的对应关系。每个 `Page` 结构会记录一个物理页面的详细信息，而每个页表项则映射到这个物理页面。
+
+  - 页目录项（PDE）负责指向页表的物理内存地址。
+  - 页表项（PTE）则具体指向一个物理页的地址（即 `Page` 结构中的物理地址）。
+
+当 `Page` 结构中的页面被映射到虚拟地址空间时，页表项将指向该物理页面，形成虚拟地址到物理地址的映射。
 
 
 
@@ -130,5 +241,161 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create) {
 ### 练习5：阅读代码和实现手册，理解页表映射方式相关知识（思考题）
 
 ### 扩展练习 Challenge：实现不考虑实现开销和效率的LRU页替换算法（需要编程）
+*challenge部分不是必做部分，不过在正确最后会酌情加分。需写出有详细的设计、分析和测试的实验报告。完成出色的可获得适当加分。*
+
+在操作系统中，页面置换算法用于管理有限的物理内存，通过选择合适的页面进行换出，确保系统能够高效运行。LRU（Least Recently Used）算法是一种常见的页面置换策略，它通过记录页面的访问时间来决定哪些页面应该被换出。LRU 算法选择最久未被访问的页面进行换出，保证最近使用的页面始终在内存中。
+
+本实验通过实现一个不考虑开销和效率的 LRU 页替换算法，使用双向链表来模拟 LRU 页替换机制，并进行测试验证。
+
+#### 1._lru_init_mm：初始化页面替换链表
+   ```C
+    static int _lru_init_mm(struct mm_struct *mm) {
+        list_init(&pra_list_head);  // 初始化链表
+        mm->sm_priv = &pra_list_head;  // 将链表头部的地址赋值给 mm->sm_priv
+        return 0;
+    }
+   ```
+功能：此函数负责初始化页面替换算法所需的数据结构。
+- 首先，它调用 list_init 函数初始化全局变量 pra_list_head，这个变量将用于管理页面的替换。
+- 然后，将链表的头部地址存储在 mm->sm_priv 中，sm_priv 是 mm_struct 结构体中的一个指针，专门用于存储与当前进程相关的页面替换数据。
+
+设计说明：在 LRU 算法中，我们使用一个链表来管理页面的访问顺序。该函数确保每个进程拥有独立的链表，以便管理该进程的页面替换。
+
+#### 2. _lru_map_swappable：标记页面为可换出
+   ```C
+ static int _lru_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int swap_in) {
+     list_entry_t *head = (list_entry_t*) mm->sm_priv;
+     list_entry_t *entry = &(page->pra_page_link);
+     
+     assert(entry != NULL && head != NULL);
+     
+     // 遍历链表以检查页面是否已经存在
+     list_entry_t *le = list_next(head);
+     while (le != head) {
+         if (le == entry) {
+             // 如果页面已在链表中，将其删除
+             list_del(entry);
+             break;
+         }
+         le = list_next(le);
+     }
+
+     // 将页面插入到链表头部的后面，表示最近使用
+     list_add_after(head, entry);
+     
+     return 0;
+ }
+   ```
+功能：此函数标记页面为可换出页面，并在访问时更新页面的顺序。当页面被访问时，它会被从链表中删除并插入到链表头部，表示这是最近使用的页面。
+
+设计说明：
+- 我们遍历链表检查页面是否已存在，如果存在，则将其从链表中删除（移除旧的位置）。
+- 然后，将该页面插入到链表的头部，确保其被标记为“最近使用”。
+这种操作保证了链表中最前面的页面为最近访问的页面，尾部的页面为最久未访问的页面。
+
+#### 3. _lru_swap_out_victim：选择需要换出的页面
+   ```C
+ static int _lru_swap_out_victim(struct mm_struct *mm, struct Page **ptr_page, int in_tick) {
+     list_entry_t *head = (list_entry_t*) mm->sm_priv;
+     assert(head != NULL);
+     assert(in_tick == 0);
+
+     // 找到链表尾部的页面（最久未使用的页面）
+     list_entry_t *victim = list_prev(head);
+     if (victim == head) {
+         return -1; // 链表为空，无法找到被替换的页面
+     }
+     
+     list_del(victim); // 从链表中移除该页面
+     *ptr_page = le2page(victim, pra_page_link); // 设置被替换页面的指针
+     return 0;
+ }
+   ```
+功能：
+该函数负责选择需要换出的页面，即链表中尾部的页面（最久未使用的页面）。如果链表为空，表示没有页面可以换出，返回 -1；否则，移除链表尾部的页面，并返回该页面的指针。
+
+设计说明：
+- 链表尾部的页面最久未使用，因此最合适用于替换。
+- 通过 list_prev 获取链表尾部的页面，使用 list_del 从链表中删除该页面，最后返回页面指针。
+
+#### 4. _lru_check_swap：测试 LRU 页替换算法
+   ```C
+ static int _lru_check_swap(void) {
+     cprintf("write Virt Page c in lru_check_swap\n");
+     *(unsigned char *)0x3000 = 0x0c;
+     assert(pgfault_num == 4);
+     cprintf("write Virt Page a in lru_check_swap\n");
+     *(unsigned char *)0x1000 = 0x0a;
+     assert(pgfault_num == 4);
+     cprintf("write Virt Page d in lru_check_swap\n");
+     *(unsigned char *)0x4000 = 0x0d;
+     assert(pgfault_num == 4);
+     cprintf("write Virt Page b in lru_check_swap\n");
+     *(unsigned char *)0x2000 = 0x0b;
+     assert(pgfault_num == 4);
+     cprintf("write Virt Page e in lru_check_swap\n");
+     *(unsigned char *)0x5000 = 0x0e;
+     assert(pgfault_num == 5);
+     cprintf("write Virt Page b in lru_check_swap\n");
+     *(unsigned char *)0x2000 = 0x0b;
+     assert(pgfault_num == 5);
+     cprintf("write Virt Page a in lru_check_swap\n");
+     *(unsigned char *)0x1000 = 0x0a;
+     assert(pgfault_num == 6);
+     cprintf("write Virt Page b in lru_check_swap\n");
+     *(unsigned char *)0x2000 = 0x0b;
+     assert(pgfault_num == 7);
+     cprintf("write Virt Page c in lru_check_swap\n");
+     *(unsigned char *)0x3000 = 0x0c;
+     assert(pgfault_num == 8);
+     cprintf("write Virt Page d in lru_check_swap\n");
+     *(unsigned char *)0x4000 = 0x0d;
+     assert(pgfault_num == 9);
+     cprintf("write Virt Page e in lru_check_swap\n");
+     *(unsigned char *)0x5000 = 0x0e;
+     assert(pgfault_num == 10);
+     cprintf("write Virt Page a in lru_check_swap\n");
+     assert(*(unsigned char *)0x1000 == 0x0a);
+     *(unsigned char *)0x1000 = 0x0a;
+     assert(pgfault_num == 11);
+     return 0;
+ }
+   ```
+功能：
+该函数用于测试 LRU 页替换算法的正确性。通过访问不同的虚拟页面并触发页面错误（pgfault_num），验证 LRU 算法是否按照预期替换最久未使用的页面。
+
+设计说明：
+- 在每次访问页面时，通过对虚拟地址的访问模拟触发页面错误。
+pgfault_num 是用于记录页面错误次数的变量，测试过程中每次访问页面都会增加其值。
+- 通过检查 pgfault_num 的值是否符合预期，来验证算法是否正确地执行了页面替换。
+
+#### 5. swap_manager_lru：定义 LRU 页替换管理器
+   ```C
+ struct swap_manager swap_manager_lru = 
+ {
+     .name            = "lru swap manager",
+     .init            = &_lru_init,
+     .init_mm         = &_lru_init_mm,
+     .tick_event      = &_lru_tick_event,
+     .map_swappable   = &_lru_map_swappable,
+     .set_unswappable = &_lru_set_unswappable,
+     .swap_out_victim = &_lru_swap_out_victim,
+     .check_swap      = &_lru_check_swap,
+ };
+   ```
+功能：
+设计了一个 swap_manager 结构体实例，包含了 LRU 页替换算法所需的所有函数。这些函数包括初始化、页面标记为可换出、选择换出页面、测试交换等操作。
+
+#### 实验结果与分析
+在进行测试时，_lru_check_swap 函数模拟了多次页面访问，验证了 LRU 算法的有效性。通过访问不同的虚拟页面，测试了页替换过程中最久未使用页面的选择逻辑，并使用 pgfault_num 检查了页面换出的次数。
+
+最终结果显示，LRU 算法能够正确地根据页面的访问顺序选择最久未使用的页面进行替换，并且实验中没有出现意外错误，证明算法的实现是正确的。
+
+#### 总结
+本实验通过实现不考虑效率的 LRU 页替换算法，深入理解了操作系统中页面置换的原理。通过使用链表来管理页面访问顺序，我们能够模拟和验证 LRU 算法的正确性，并进行性能测试。
+
+在实际应用中，LRU 算法由于其高效的访问管理机制，被广泛应用于虚拟内存管理中。实验过程中的设计和实现为进一步研究和优化页面替换算法提供了基础。
 ## 三. 实验中的知识点
+
+
 

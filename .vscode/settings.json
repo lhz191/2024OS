@@ -6,6 +6,7 @@
         "buddy_system_pmm.h": "c",
         "pmm.h": "c",
         "sync.h": "c",
-        "sbi.h": "c"
+        "sbi.h": "c",
+        "swap_lru.h": "c"
     }
 }

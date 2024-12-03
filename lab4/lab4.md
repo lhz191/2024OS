@@ -128,5 +128,5 @@ struct trapframe 主要用于存储发生异常（如中断、系统调用）时
 
 在进程中，tf 保存了进程在发生异常或中断时的寄存器值，包括栈指针、程序计数器等关键信息。
 
-##### (4)struct trapframe* tf在本实验中的作用:
+##### (4)struct trapframe* tf在本实验中的作用(通过看代码和编程调试发现):
 在本实验中，forkret 函数内部调用了 forkrets(current->tf)，其中 current->tf 是当前进程的 trapframe。通过 forkrets，当前进程的 trapframe 被传递给新进程，初始化新进程的栈，并跳转到 __trapret，使新进程开始执行。即完成创建子进程时，将父进程的trapframe传递给子进程的作用。

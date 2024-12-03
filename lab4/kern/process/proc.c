@@ -102,8 +102,18 @@ alloc_proc(void) {
      *       uint32_t flags;                             // Process flag
      *       char name[PROC_NAME_LEN + 1];               // Process name
      */
-
-
+            proc->state = PROC_UNINIT;   // 将进程状态设置为未初始化状态
+            proc->pid = -1;              // 初始化进程ID为-1，表示还未分配有效的进程ID
+            proc->runs = 0;              // 进程的运行次数设置为0
+            proc->kstack = 0;            // 内核栈指针初始化为0，尚未分配栈空间
+            proc->need_resched = 0;      // 进程是否需要重新调度标志，初始化为0，不需要调度
+            proc->parent = NULL;         // 进程的父进程为空，表示没有父进程
+            proc->mm = NULL;             // 进程的内存管理结构体为空，表示未分配内存
+            memset(&(proc->context), 0, sizeof(struct context));  // 清空进程的上下文信息（包括寄存器等）
+            proc->tf = NULL;             // 进程的中断处理框架（trapframe）为空
+            proc->cr3 = boot_cr3;       // 设置进程的页表基地址为系统启动时的页表基地址（boot_cr3）
+            proc->flags = 0;             // 进程的标志位初始化为0
+            memset(proc->name, 0, PROC_NAME_LEN + 1);  // 清空进程名称
     }
     return proc;
 }
@@ -124,6 +134,7 @@ get_proc_name(struct proc_struct *proc) {
 }
 
 // get_pid - alloc a unique pid for process
+//找最小的可用pid
 static int
 get_pid(void) {
     static_assert(MAX_PID > MAX_PROCESS);

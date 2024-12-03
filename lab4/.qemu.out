@@ -23,7 +23,7 @@ PMP1: 0x0000000000000000-0xffffffffffffffff (A,R,W,X)
 
 Special kernel symbols:
   entry  0xc0200032 (virtual)
-  etext  0xc0204940 (virtual)
+  etext  0xc0204ae8 (virtual)
   edata  0xc020a058 (virtual)
   end    0xc02155c4 (virtual)
 Kernel executable memory footprint: 86KB
@@ -41,7 +41,8 @@ Store/AMO page fault
 page falut at 0x00000100: K/W
 check_pgfault() succeeded!
 check_vmm() succeeded.
-kernel panic at kern/process/proc.c:376:
+alloc_proc() correct!
+kernel panic at kern/process/proc.c:386:
     create init_main failed.
 
 Welcome to the kernel debug monitor!!

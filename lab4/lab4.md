@@ -455,6 +455,39 @@ do_fork函数的主要工作是:
 
 这种实现方式确保了每个进程获得唯一的PID，满足操作系统的基本要求。
 
+
+## 练习三 编写proc_run 函数（需要编码）
+```cpp
+void
+proc_run(struct proc_struct *proc) {
+    if (proc != current) {
+        // LAB4:EXERCISE3 YOUR CODE
+        /*
+        * Some Useful MACROs, Functions and DEFINEs, you can use them in below implementation.
+        * MACROs or Functions:
+        *   local_intr_save():        Disable interrupts
+        *   local_intr_restore():     Enable Interrupts
+        *   lcr3():                   Modify the value of CR3 register
+        *   switch_to():              Context switching between two processes
+        */
+        bool intr_flag;
+        local_intr_save(intr_flag);
+        struct proc_struct * temp = current;
+        current = proc;
+        lcr3(current->cr3);
+        switch_to(&(temp->context),&(proc->context));
+        local_intr_restore(intr_flag);
+       
+    }
+}
+```
+
+proc_run 函数用于将指定的进程 proc 切换到当前运行的进程。如果 proc 不是当前进程，则执行进程切换。首先，通过 local_intr_save 关闭中断以确保切换过程不被打断。然后，将当前进程 current 保存到临时变量 temp，并将 current 更新为 proc。接着，通过 lcr3 切换到 proc 的页表，确保地址空间正确。随后，调用 switch_to 函数，保存当前进程的上下文并恢复 proc 的上下文。最后，通过 local_intr_restore 恢复中断。这样，CPU 就会从 proc 的上下文继续执行，完成进程切换。
+
+### 在本实验的执行过程中，创建且运行了几个内核线程？
+
+一共创建了两个内核线程，分别为：init_main 和 idleproc。
+
 ## 扩展练习Challenge
 
 ### 说明语句local_intr_save(intr_flag)，local_intr_restore(intr_flag);是如何实现开关中断的？

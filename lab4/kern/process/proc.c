@@ -316,19 +316,29 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     //    5. insert proc_struct into hash_list && proc_list
     //    6. call wakeup_proc to make the new child process RUNNABLE
     //    7. set ret vaule using child proc's pid
-    proc = alloc_proc();
-    proc->parent = current;
-    setup_kstack(proc);
-    copy_mm(clone_flags, proc);
+    if ((proc = alloc_proc()) == NULL) {
+        goto fork_out;
+    }
+    proc->parent = current;//将子进程的父节点设置为当前进程
+    if (setup_kstack(proc)) {
+        goto bad_fork_cleanup_proc;
+    }
+    if(copy_mm(clone_flags, proc)){
+        goto bad_fork_cleanup_kstack;
+    }
     copy_thread(proc, stack, tf);
-    int pid = get_pid();
-    proc->pid = pid;
-    hash_proc(proc);
-    list_add(&proc_list, &(proc->list_link));
-    nr_process++;
-    proc->state = PROC_RUNNABLE;
-    ret = proc->pid;
-    
+    bool intr_flag;
+    local_intr_save(intr_flag);//屏蔽中断，intr_flag置为1
+    {
+        proc->pid = get_pid();//获取当前进程PID
+        hash_proc(proc); //建立hash映射
+        list_add(&proc_list, &(proc->list_link));//加入进程链表
+        nr_process ++;//进程数加一
+    }
+    local_intr_restore(intr_flag);//恢复中断
+
+    wakeup_proc(proc);
+    ret = proc->pid;//返回当前进程的PID
 
 fork_out:
     return ret;

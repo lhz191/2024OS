@@ -23,7 +23,7 @@ PMP1: 0x0000000000000000-0xffffffffffffffff (A,R,W,X)
 
 Special kernel symbols:
   entry  0xc0200032 (virtual)
-  etext  0xc0204e36 (virtual)
+  etext  0xc0204ec6 (virtual)
   edata  0xc020a060 (virtual)
   end    0xc02155cc (virtual)
 Kernel executable memory footprint: 86KB
@@ -100,7 +100,7 @@ check_swap() succeeded!
 this initproc, pid = 1, name = "init"
 To U: "Hello world!!".
 To U: "en.., Bye, Bye. :)"
-kernel panic at kern/process/proc.c:349:
+kernel panic at kern/process/proc.c:359:
     process exit!!.
 
 Welcome to the kernel debug monitor!!

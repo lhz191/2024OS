@@ -454,3 +454,41 @@ do_fork函数的主要工作是:
 - **优化查找**：使用`next_safe`变量记录下一个可能产生冲突的PID值，减少不必要的遍历。
 
 这种实现方式确保了每个进程获得唯一的PID，满足操作系统的基本要求。
+
+## 扩展练习Challenge
+
+### 说明语句local_intr_save(intr_flag)，local_intr_restore(intr_flag);是如何实现开关中断的？
+
+
+语句的相关定义位于/kern/sync/sync.h中，代码如下：
+```c
+static inline bool __intr_save(void) {
+    if (read_csr(sstatus) & SSTATUS_SIE) {
+        intr_disable();
+        return 1;
+    }
+    return 0;
+}
+
+static inline void __intr_restore(bool flag) {
+    if (flag) {
+        intr_enable();
+    }
+}
+
+#define local_intr_save(x) \
+    do {                   \
+        x = __intr_save(); \
+    } while (0)
+#define local_intr_restore(x) __intr_restore(x);
+```
+### 变量解释
+- `read_csr(sstatus)`：这是一个读取控制状态寄存器的操作，`sstatus`寄存器包含了当前中断状态等信息。
+- `SSTATUS_SIE`：这是一个位掩码，用于检查`SIE`位的状态。
+- `intr_disable`和`intr_enable`：这些函数分别用于禁用和启用中断，确保在关键代码段执行时不会被中断打断。
+- `local_intr_save`和`local_intr_restore`：这两个宏提供了一种简便的方法来保存和恢复中断状态，确保代码的原子性和一致性。
+
+
+当调用`local_intr_save`时，存当前的中断状态，并禁用中断。此时会读取`sstatus`寄存器，判断`SIE`位的值，如果该位为1，则说明中断是能进行的，这时需要调用`intr_disable`将该位置0，并返回1，将`intr_flag`赋值为1；如果该位为0，则说明中断此时已经不能进行，则返回0，将`intr_flag`赋值为0。以此保证之后的代码执行时不会发生中断。
+
+当调用`local_intr_restore`，用于恢复之前保存的中断状态。它调用`__intr_restore`函数，并传入`intr_flag`。如果`intr_flag`为1，表示中断在调用`local_intr_save`之前是启用的，`__intr_restore`会调用`intr_enable`来重新启用中断。如果`intr_flag`为0，表示中断在调用`local_intr_save`之前已经是禁用的，`__intr_restore`不会做任何操作。

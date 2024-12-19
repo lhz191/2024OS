@@ -110,6 +110,22 @@ alloc_proc(void) {
      *       uint32_t wait_state;                        // waiting state
      *       struct proc_struct *cptr, *yptr, *optr;     // relations between processes
      */
+        proc->state = PROC_UNINIT;   // 将进程状态设置为未初始化状态
+        proc->pid = -1;              // 初始化进程ID为-1，表示还未分配有效的进程ID
+        proc->runs = 0;              // 进程的运行次数设置为0
+        proc->kstack = 0;            // 内核栈指针初始化为0，尚未分配栈空间
+        proc->need_resched = 0;      // 进程是否需要重新调度标志，初始化为0，不需要调度
+        proc->parent = NULL;         // 进程的父进程为空，表示没有父进程
+        proc->mm = NULL;             // 进程的内存管理结构体为空，表示未分配内存
+        memset(&(proc->context), 0, sizeof(struct context));  // 清空进程的上下文信息（包括寄存器等）
+        proc->tf = NULL;             // 进程的中断处理框架（trapframe）为空
+        proc->cr3 = boot_cr3;       // 设置进程的页表基地址为系统启动时的页表基地址（boot_cr3）
+        proc->flags = 0;             // 进程的标志位初始化为0
+        memset(proc->name, 0, PROC_NAME_LEN + 1);  // 清空进程名称
+
+
+        proc->wait_state = 0;                                
+        proc->cptr = proc->optr = proc->yptr = NULL;   
     }
     return proc;
 }
@@ -206,7 +222,14 @@ proc_run(struct proc_struct *proc) {
         *   lcr3():                   Modify the value of CR3 register
         *   switch_to():              Context switching between two processes
         */
-
+        bool intr_flag;
+        local_intr_save(intr_flag);
+        struct proc_struct * temp = current;
+        current = proc;
+        lcr3(current->cr3);
+        switch_to(&(temp->context),&(proc->context));
+        local_intr_restore(intr_flag);
+       
     }
 }
 
@@ -404,6 +427,34 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
     *    update step 5: insert proc_struct into hash_list && proc_list, set the relation links of process
     */
  
+    if ((proc = alloc_proc()) == NULL) {
+        goto fork_out;
+    }
+    proc->parent = current;//将子进程的父节点设置为当前进程
+
+    assert(current->wait_state == 0); // 确保当前进程在等待
+
+    if (setup_kstack(proc)) {
+        goto bad_fork_cleanup_proc;
+    }
+    if(copy_mm(clone_flags, proc)){
+        goto bad_fork_cleanup_kstack;
+    }
+    copy_thread(proc, stack, tf);
+    bool intr_flag;
+    local_intr_save(intr_flag);//屏蔽中断，intr_flag置为1
+    {
+        proc->pid = get_pid();//获取当前进程PID
+        hash_proc(proc); //建立hash映射
+        // list_add(&proc_list, &(proc->list_link));//加入进程链表
+        // nr_process ++;//进程数加一
+        set_links(proc); // 设置进程链接
+    }
+    local_intr_restore(intr_flag);//恢复中断
+
+    wakeup_proc(proc);
+    ret = proc->pid;//返回当前进程的PID
+
 fork_out:
     return ret;
 
@@ -603,7 +654,12 @@ load_icode(unsigned char *binary, size_t size) {
      *          tf->status should be appropriate for user program (the value of sstatus)
      *          hint: check meaning of SPP, SPIE in SSTATUS, use them by SSTATUS_SPP, SSTATUS_SPIE(defined in risv.h)
      */
-
+    // Set the user stack top 
+    tf->gpr.sp = USTACKTOP; 
+    // Set the entry point of the user program 
+    tf->epc = elf->e_entry; 
+    // Set the status register for the user program 
+    tf->status = (sstatus & ~SSTATUS_SPP) | SSTATUS_SPIE;
 
     ret = 0;
 out:

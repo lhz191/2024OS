@@ -100,7 +100,7 @@ check_swap() succeeded!
 this initproc, pid = 1, name = "init"
 To U: "Hello world!!".
 To U: "en.., Bye, Bye. :)"
-kernel panic at kern/process/proc.c:359:
+kernel panic at kern/process/proc.c:358:
     process exit!!.
 
 Welcome to the kernel debug monitor!!

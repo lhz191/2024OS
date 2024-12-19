@@ -7,6 +7,8 @@
         "pmm.h": "c",
         "sync.h": "c",
         "sbi.h": "c",
-        "swap_lru.h": "c"
+        "swap_lru.h": "c",
+        "string_view": "cpp",
+        "system_error": "cpp"
     }
 }

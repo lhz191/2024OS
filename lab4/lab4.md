@@ -525,3 +525,4 @@ static inline void __intr_restore(bool flag) {
 当调用`local_intr_save`时，存当前的中断状态，并禁用中断。此时会读取`sstatus`寄存器，判断`SIE`位的值，如果该位为1，则说明中断是能进行的，这时需要调用`intr_disable`将该位置0，并返回1，将`intr_flag`赋值为1；如果该位为0，则说明中断此时已经不能进行，则返回0，将`intr_flag`赋值为0。以此保证之后的代码执行时不会发生中断。
 
 当调用`local_intr_restore`，用于恢复之前保存的中断状态。它调用`__intr_restore`函数，并传入`intr_flag`。如果`intr_flag`为1，表示中断在调用`local_intr_save`之前是启用的，`__intr_restore`会调用`intr_enable`来重新启用中断。如果`intr_flag`为0，表示中断在调用`local_intr_save`之前已经是禁用的，`__intr_restore`不会做任何操作。
+
